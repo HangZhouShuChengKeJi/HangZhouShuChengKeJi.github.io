@@ -24,7 +24,7 @@
 
 QQ群：695332013
 
-微信：![test](wechat.png){:height="10" width="10"}
+微信：![test](wechat.png){:height="100" width="100"}
 
 
 
