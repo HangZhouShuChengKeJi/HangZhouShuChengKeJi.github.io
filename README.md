@@ -1,37 +1,30 @@
-## 杭州数橙科技有限公司
+## 杭州数橙科技-技术部
 
-You can use the [editor on GitHub](https://github.com/HangZhouShuChengKeJi/HangZhouShuChengKeJi.github.io/edit/master/README.md) to maintain and preview the content for your website in Markdown files.
+#### 热衷于开源
 
-Whenever you commit to this repository, GitHub Pages will run [Jekyll](https://jekyllrb.com/) to rebuild the pages in your site, from the content in your Markdown files.
+| 开源项目                                                     | 描述                                                         |
+| ------------------------------------------------------------ | ------------------------------------------------------------ |
+| [事件驱动框架](https://github.com/HangZhouShuChengKeJi/eventframework) | 比如用户注册完毕的事件，触发对用户体验vip的授予机制<br>又如用户修改了某个商品信息事件，触发了对订单中的商品信息的修改等<br>不必进行复杂的配置，只需要发一个常见的spring 消息，可以分布式的接收该消息并处理 |
+| [极简数据报表](https://github.com/HangZhouShuChengKeJi/simple-report) | 只经过简单的sql配置，即可生成报表。公司初期，极为有用        |
+| [poi-helper](https://github.com/HangZhouShuChengKeJi/poi-helper) | 经过对 [Apache POI ](https://poi.apache.org/)的封装，利用其提供的api 能够更方便的生成 word 文档 |
+| Free-font                                                    | 收罗了网上各种免费可商用的好看的字体。其中包含了阿里巴巴等大公司出品的内容 |
 
-### Markdown
 
-Markdown is a lightweight and easy-to-use syntax for styling your writing. It includes conventions for
 
-```markdown
-Syntax highlighted code block
+#### 热衷于积累
 
-# Header 1
-## Header 2
-### Header 3
+| 技术积累                                      | 描述 |
+| --------------------------------------------- | ---- |
+| [架构积累]-app 中内嵌的h5页面的缓存和版本管理 |      |
+| [技术部内部分享]-各种好用的工具               |      |
+| [技术部内部分享]-Android内存溢出问题          |      |
+|                                               |      |
 
-- Bulleted
-- List
+#### 联系我们
 
-1. Numbered
-2. List
+QQ群：695332013
 
-**Bold** and _Italic_ and `Code` text
+微信：![test](wechat.png){:height="10" width="10"}
 
-[Link](url) and ![Image](src)
-```
 
-For more details see [GitHub Flavored Markdown](https://guides.github.com/features/mastering-markdown/).
 
-### Jekyll Themes
-
-Your Pages site will use the layout and styles from the Jekyll theme you have selected in your [repository settings](https://github.com/HangZhouShuChengKeJi/HangZhouShuChengKeJi.github.io/settings). The name of this theme is saved in the Jekyll `_config.yml` configuration file.
-
-### Support or Contact
-
-Having trouble with Pages? Check out our [documentation](https://help.github.com/categories/github-pages-basics/) or [contact support](https://github.com/contact) and we’ll help you sort it out.
