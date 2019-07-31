@@ -322,7 +322,7 @@ fun checkUpdate() {
 
 具体的流程可以参考下图：
 
-![流程图](/20190731121723.jpg)
+![流程图](/blog/h5-cache/20190731121723.jpg)
 
 举个例子，比如现在拦截到 http://www.91chengguo.com/h5/login/js/index.js 。我们获取 url 的 path :
 
