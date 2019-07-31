@@ -18,7 +18,7 @@ author 毛毛
 
 目前，这套方案已经开源，欢迎大家来交流：
 
-https://github.com/HangZhouShuChengKeJi/H5Cache-Android
+[https://github.com/HangZhouShuChengKeJi/H5Cache-Android](https://github.com/HangZhouShuChengKeJi/H5Cache-Android)
 
 下面，就详细展开介绍下吧。
 
@@ -69,6 +69,8 @@ url | http://www.91chengguo.com/h5/login/html/index.html
 md5| 378f4280c25e9e58f0a268840ce6edee
 create_time| 2019-07-10 15:25:55
 update_time | 2019-07-10 15:25:55
+
+后续 H5 页面如果有更新，重新上传最新的 zip 包即可。每个资源文件的版本都是交由它的 md5 值来控制，不需要开发人员人为控制。
 
 另外，服务端还会保存 zip 包的 md5 值，当作整体的 global version ，方便和移动端比较，后续在更新资源文件接口中会讲到。
 
