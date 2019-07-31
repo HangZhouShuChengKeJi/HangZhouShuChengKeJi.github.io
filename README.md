@@ -8,6 +8,7 @@
 | [极简数据报表](https://github.com/HangZhouShuChengKeJi/simple-report) | 只经过简单的sql配置，即可生成报表。公司初期，极为有用        |
 | [poi-helper](https://github.com/HangZhouShuChengKeJi/poi-helper) | 经过对 [Apache POI ](https://poi.apache.org/)的封装，利用其提供的api 能够更方便的生成 word 文档 |
 | Free-font                                                    | 收罗了网上各种免费可商用的好看的字体。其中包含了阿里巴巴等大公司出品的内容 |
+| [H5Cache-Android](https://github.com/HangZhouShuChengKeJi/H5Cache-Android)                                                    | Android 端H5页面静态资源文件缓存 |
 
 
 
