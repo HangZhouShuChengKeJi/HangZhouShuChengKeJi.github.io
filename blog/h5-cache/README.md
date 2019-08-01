@@ -225,14 +225,29 @@ private fun readMappingFile(context: Context, versionCode: Int) {
 直接来看代码：
 
 ``` kotlin
+fun checkUpdateInterval() {
+    Observable.interval(0, 5 * 60, TimeUnit.SECONDS)
+        .subscribeOn(Schedulers.io())
+        .subscribe(object : Subscriber<Long>() {
+
+            override fun onNext(t: Long?) {
+                checkUpdate()
+            }
+
+            override fun onCompleted() {
+            }
+
+            override fun onError(e: Throwable?) {
+                e?.printStackTrace()
+            }
+
+        })
+}
+
 fun checkUpdate() {
-    Observable
-        .interval(0, 5 * 60, TimeUnit.SECONDS)
+    // 这里会去调用服务端的更新资源文件接口
+    H5CacheTask.checkUpdate(version)
         .observeOn(Schedulers.io())
-        .flatMap {
-            // 这里会去调用服务端的更新资源文件接口
-            return@flatMap H5CacheTask.checkUpdate(version)
-        }
         .filter {
             return@filter it.needUpdate
         }
@@ -294,6 +309,7 @@ fun checkUpdate() {
             }
 
             override fun onCompleted() {
+                unsubscribe()
             }
 
             override fun onError(e: Throwable?) {
@@ -312,6 +328,7 @@ fun checkUpdate() {
                     val file = File(cachePathDir + File.separator + H5_CACHE_JSON)
                     file.writeText(URLDecoder.decode(json, "UTF-8"))
                 }
+                unsubscribe()
             }
 
         })
