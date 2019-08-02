@@ -1,18 +1,6 @@
 ---
 layout: page
-title: About
-permalink: /about/
+title: 关于
 ---
 
-This is the base Jekyll theme. You can find out more info about customizing your Jekyll theme, as well as basic Jekyll usage documentation at [jekyllrb.com](https://jekyllrb.com/)
-
-You can find the source code for Minima at GitHub:
-[jekyll][jekyll-organization] /
-[minima](https://github.com/jekyll/minima)
-
-You can find the source code for Jekyll at GitHub:
-[jekyll][jekyll-organization] /
-[jekyll](https://github.com/jekyll/jekyll)
-
-
-[jekyll-organization]: https://github.com/jekyll
+橙果错题本是一个错题整理工具，可以帮助学生用户将错题进行整理记录，方便后续的复习。错题整理流程为拍照、选取及打印，学生还可以在工具上管理错题文档，进行编辑修改及删除操作，致力于帮助学生简化错题记录流程。杭州数橙科技有限公司旗下。
