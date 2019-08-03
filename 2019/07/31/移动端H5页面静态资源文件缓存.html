@@ -1,0 +1,1318 @@
+<!DOCTYPE html><html lang="zh">
+  <head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no"><title>移动端H5页面静态资源文件缓存 - 杭州数橙科技</title>
+
+<meta name="description" content="缓存目的现如今，很多开发团队在开发模式上都会选择 Native/H5 混合开发，随之而来的问题就是怎样加快 H5 页面加载的速度，提升用户的体验？如何做到 H5 页面与 Native 页面流畅度相媲美？这也是很多移动端开发者面临的困难点之一，所以今天就给大家来介绍下橙果错题本在这方面的一些积累。">
+<link rel="canonical" href="http://code.91chengguo.com/2019/07/31/%E7%A7%BB%E5%8A%A8%E7%AB%AFH5%E9%A1%B5%E9%9D%A2%E9%9D%99%E6%80%81%E8%B5%84%E6%BA%90%E6%96%87%E4%BB%B6%E7%BC%93%E5%AD%98.html"><link rel="alternate" type="application/rss+xml" title="杭州数橙科技" href="/feed.xml">
+<!-- begin favicon --><link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png"><link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png"><link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png"><link rel="manifest" href="/assets/site.webmanifest"><link rel="mask-icon" href="/assets/safari-pinned-tab.svg" color="#fc4d50"><link rel="shortcut icon" href="/assets/favicon.ico">
+
+<meta name="msapplication-TileColor" content="#ffc40d"><meta name="msapplication-config" content="/assets/browserconfig.xml">
+
+<meta name="theme-color" content="#ffffff">
+<!-- end favicon --><link rel="stylesheet" href="/assets/css/main.css"><link rel="stylesheet" href="https://cdn.bootcss.com/font-awesome/5.10.0-12/css/all.min.css" >
+<script>(function() {
+  window.isArray = function(val) {
+    return Object.prototype.toString.call(val) === '[object Array]';
+  };
+  window.isString = function(val) {
+    return typeof val === 'string';
+  };
+
+  window.decodeUrl = function(str) {
+    return str ? decodeURIComponent(str.replace(/\+/g, '%20')) : '';
+  };
+
+  window.hasEvent = function(event) {
+    return 'on'.concat(event) in window.document;
+  };
+
+  window.isOverallScroller = function(node) {
+    return node === document.documentElement || node === document.body || node === window;
+  };
+
+  window.isFormElement = function(node) {
+    var tagName = node.tagName;
+    return tagName === 'INPUT' || tagName === 'SELECT' || tagName === 'TEXTAREA';
+  };
+
+  window.pageLoad = (function () {
+    var loaded = false, cbs = [];
+    window.addEventListener('load', function () {
+      var i;
+      loaded = true;
+      if (cbs.length > 0) {
+        for (i = 0; i < cbs.length; i++) {
+          cbs[i]();
+        }
+      }
+    });
+    return {
+      then: function(cb) {
+        cb && (loaded ? cb() : (cbs.push(cb)));
+      }
+    };
+  })();
+})();(function() {
+  window.throttle = function(func, wait) {
+    var args, result, thisArg, timeoutId, lastCalled = 0;
+
+    function trailingCall() {
+      lastCalled = new Date;
+      timeoutId = null;
+      result = func.apply(thisArg, args);
+    }
+    return function() {
+      var now = new Date,
+        remaining = wait - (now - lastCalled);
+
+      args = arguments;
+      thisArg = this;
+
+      if (remaining <= 0) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+        lastCalled = now;
+        result = func.apply(thisArg, args);
+      } else if (!timeoutId) {
+        timeoutId = setTimeout(trailingCall, remaining);
+      }
+      return result;
+    };
+  };
+})();(function() {
+  var Set = (function() {
+    var add = function(item) {
+      var i, data = this._data;
+      for (i = 0; i < data.length; i++) {
+        if (data[i] === item) {
+          return;
+        }
+      }
+      this.size ++;
+      data.push(item);
+      return data;
+    };
+
+    var Set = function(data) {
+      this.size = 0;
+      this._data = [];
+      var i;
+      if (data.length > 0) {
+        for (i = 0; i < data.length; i++) {
+          add.call(this, data[i]);
+        }
+      }
+    };
+    Set.prototype.add = add;
+    Set.prototype.get = function(index) { return this._data[index]; };
+    Set.prototype.has = function(item) {
+      var i, data = this._data;
+      for (i = 0; i < data.length; i++) {
+        if (this.get(i) === item) {
+          return true;
+        }
+      }
+      return false;
+    };
+    Set.prototype.is = function(map) {
+      if (map._data.length !== this._data.length) { return false; }
+      var i, j, flag, tData = this._data, mData = map._data;
+      for (i = 0; i < tData.length; i++) {
+        for (flag = false, j = 0; j < mData.length; j++) {
+          if (tData[i] === mData[j]) {
+            flag = true;
+            break;
+          }
+        }
+        if (!flag) { return false; }
+      }
+      return true;
+    };
+    Set.prototype.values = function() {
+      return this._data;
+    };
+    return Set;
+  })();
+
+  window.Lazyload = (function(doc) {
+    var queue = {js: [], css: []}, sources = {js: {}, css: {}}, context = this;
+    var createNode = function(name, attrs) {
+      var node = doc.createElement(name), attr;
+      for (attr in attrs) {
+        if (attrs.hasOwnProperty(attr)) {
+          node.setAttribute(attr, attrs[attr]);
+        }
+      }
+      return node;
+    };
+    var end = function(type, url) {
+      var s, q, qi, cbs, i, j, cur, val, flag;
+      if (type === 'js' || type ==='css') {
+        s = sources[type], q = queue[type];
+        s[url] = true;
+        for (i = 0; i < q.length; i++) {
+          cur = q[i];
+          if (cur.urls.has(url)) {
+            qi = cur, val = qi.urls.values();
+            qi && (cbs = qi.callbacks);
+            for (flag = true, j = 0; j < val.length; j++) {
+              cur = val[j];
+              if (!s[cur]) {
+                flag = false;
+              }
+            }
+            if (flag && cbs && cbs.length > 0) {
+              for (j = 0; j < cbs.length; j++) {
+                cbs[j].call(context);
+              }
+              qi.load = true;
+            }
+          }
+        }
+      }
+    };
+    var load = function(type, urls, callback) {
+      var s, q, qi, node, i, cur,
+        _urls = typeof urls === 'string' ? new Set([urls]) : new Set(urls), val, url;
+      if (type === 'js' || type ==='css') {
+        s = sources[type], q = queue[type];
+        for (i = 0; i < q.length; i++) {
+          cur = q[i];
+          if (_urls.is(cur.urls)) {
+            qi = cur;
+            break;
+          }
+        }
+        val = _urls.values();
+        if (qi) {
+          callback && (qi.load || qi.callbacks.push(callback));
+          callback && (qi.load && callback());
+        } else {
+          q.push({
+            urls: _urls,
+            callbacks: callback ? [callback] : [],
+            load: false
+          });
+          for (i = 0; i < val.length; i++) {
+            node = null, url = val[i];
+            if (s[url] === undefined) {
+              (type === 'js' ) && (node = createNode('script', { src: url }));
+              (type === 'css') && (node = createNode('link', { rel: 'stylesheet', href: url }));
+              if (node) {
+                node.onload = (function(type, url) {
+                  return function() {
+                    end(type, url);
+                  };
+                })(type, url);
+                (doc.head || doc.body).appendChild(node);
+                s[url] = false;
+              }
+            }
+          }
+        }
+      }
+    };
+    return {
+      js: function(url, callback) {
+        load('js', url, callback);
+      },
+      css: function(url, callback) {
+        load('css', url, callback);
+      }
+    };
+  })(this.document);
+})();</script><script>
+  (function() {
+    var TEXT_VARIABLES = {
+      version: '2.2.4',
+      sources: {
+        font_awesome: 'https://cdn.bootcss.com/font-awesome/5.10.0-12/css/all.min.css',
+        jquery: 'https://cdn.bootcss.com/jquery/3.1.1/jquery.min.js',
+        leancloud_js_sdk: '//cdn1.lncld.net/static/js/3.4.1/av-min.js',
+        chart: 'https://cdn.bootcss.com/Chart.js/2.7.2/Chart.bundle.min.js',
+        gitalk: {
+          js: 'https://cdn.bootcss.com/gitalk/1.2.2/gitalk.min.js',
+          css: 'https://cdn.bootcss.com/gitalk/1.2.2/gitalk.min.css'
+        },
+        valine: 'https://unpkg.com/valine/dist/Valine.min.js',
+        mathjax: 'https://cdn.bootcss.com/mathjax/2.7.4/MathJax.js?config=TeX-MML-AM_CHTML',
+        mermaid: 'https://cdn.bootcss.com/mermaid/8.0.0-rc.8/mermaid.min.js'
+      },
+      site: {
+        toc: {
+          selectors: 'h1,h2,h3'
+        }
+      },
+      paths: {
+        search_js: '/assets/search.js'
+      }
+    };
+    window.TEXT_VARIABLES = TEXT_VARIABLES;
+  })();
+</script></head>
+  <body>
+    <div class="root" data-is-touch="false">
+      <div class="layout--page js-page-root"><div class="page__main js-page-main page__viewport cell cell--auto">
+
+      <div class="page__main-inner">
+        <div></div><div class="page__header d-print-none"><header class="header"><div class="main">
+      <div class="header__title">
+        <div class="header__brand"><svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 width="24px" height="24px" viewBox="0 0 24 24">
+<style type="text/css">
+	.st0{fill:#515151;}
+</style>
+<path class="st0" d="M1.7,22.3c5.7-5.7,11.3-5.7,17,0c3.3-3.3,3.5-5.3,0.8-6c2.7,0.7,3.5-1.1,2.3-5.6s-3.3-5.2-6.3-2.1
+	c3-3,2.3-5.2-2.1-6.3S7,1.8,7.7,4.6C7,1.8,5,2.1,1.7,5.3C7.3,11,7.3,16.7,1.7,22.3"/>
+</svg><a title="Write an awesome description for your new site here. You can edit this line in _config.yml. It will appear in your document head meta (for Google search results) and in your feed.xml site description." href="/">杭州数橙科技</a></div>
+        <button class="button button--secondary button--circle search-button js-search-toggle"><i class="fas fa-search"></i></button>
+      </div><nav class="navigation">
+        <ul><li class="navigation__link"><a href="/">首页</a></li><li class="navigation__link"><a href="/doc/cuotiben/">错题本</a></li><li class="navigation__link"><a href="/archive.html">归档</a></li><li class="navigation__link"><a href="/about.html">关于</a></li><li><button class="button button--secondary button--circle search-button js-search-toggle"><i class="fas fa-search"></i></button></li>
+        </ul>
+      </nav></div>
+  </header>
+</div><div class="page__content"><div class ="main"><div class="grid grid--reverse">
+
+              <div class="col-aside d-print-none js-col-aside"></div>
+
+              <div class="col-main cell cell--auto"><article itemscope itemtype="http://schema.org/Article"><div class="article__header"><header><h1>移动端H5页面静态资源文件缓存</h1></header></div><meta itemprop="headline" content="移动端H5页面静态资源文件缓存"><div class="article__info clearfix"><ul class="left-col menu"><li>
+              <a class="button button--secondary button--pill button--sm"
+                href="/archive.html?tag=android">android</a>
+            </li><li>
+              <a class="button button--secondary button--pill button--sm"
+                href="/archive.html?tag=%E7%BC%93%E5%AD%98">缓存</a>
+            </li></ul><ul class="right-col menu"><li><i class="fas fa-user"></i> <span></span></li><li><i class="far fa-calendar-alt"></i> <span>2019年 07月31日</span>
+            </li></ul></div><meta itemprop="datePublished" content="2019-07-31T08:00:00+08:00">
+    <meta itemprop="keywords" content="android,缓存"><div class="js-article-content"><div class="layout--article">
+
+  <div class="article__content" itemprop="articleBody"><h1 id="缓存目的">缓存目的</h1>
+<p>现如今，很多开发团队在开发模式上都会选择 Native/H5 混合开发，随之而来的问题就是怎样加快 H5 页面加载的速度，提升用户的体验？如何做到 H5 页面与 Native 页面流畅度相媲美？这也是很多移动端开发者面临的困难点之一，所以今天就给大家来介绍下橙果错题本在这方面的一些积累。</p>
+
+<p>在没有这整套方案落地之前，移动端 App 经常会收到用户反馈 H5 页面白屏或者加载慢的问题。由于每个用户所处的网络环境都有很大差异，所以这类问题在技术团队这里复现并不容易。但是基本上可以归结于网络问题，因此我们急于寻求一种方案可以解决这种痛点，对 H5 页面的静态资源文件做缓存在此环境下应运而生。</p>
+
+<p>当然，现在市面上对于静态资源文件缓存的方案已经多如牛毛，那为什么还要重复造轮子呢？因为橙果错题本的方案略有不同，可以同时解决以下两种问题：</p>
+
+<ol>
+  <li>移动端打开 H5 页面白屏/加载慢；</li>
+  <li>原先 H5 文件的版本完全交由开发人员来控制，容易造成线上事故；</li>
+</ol>
+
+<p>而这，也是写本篇博客的初衷之一。</p>
+
+<p>目前，这套方案已经开源，欢迎大家来交流：</p>
+
+<p><a href="https://github.com/HangZhouShuChengKeJi/H5Cache-Android">https://github.com/HangZhouShuChengKeJi/H5Cache-Android</a></p>
+
+<p>下面，就详细展开介绍下吧。</p>
+
+<h1 id="缓存目标">缓存目标</h1>
+<p>移动端 App 在打包时会内置一份最新的 H5 页面静态资源文件 zip 包。包中主要包含以下几种文件类型：</p>
+
+<ul>
+  <li>html</li>
+  <li>js</li>
+  <li>css</li>
+  <li>png/jpg</li>
+</ul>
+
+<p>后续的静态资源文件动态更新，也是以这几种文件类型为主。</p>
+
+<h1 id="服务端">服务端</h1>
+<p>服务端的工作主要是提供三个 API 接口</p>
+
+<ul>
+  <li>上传 zip 接口</li>
+  <li>下载 zip 接口</li>
+  <li>更新资源文件接口</li>
+</ul>
+
+<p><strong>上传 zip 接口</strong></p>
+
+<p>H5 端开发人员把所有的静态资源文件都打成一个 zip 包，然后服务端会提供一个上传 zip 包的接口。</p>
+
+<p>上传之后，服务端把包解压缩，然后遍历里面的每一个文件，插入数据库中。</p>
+
+<p>数据库中新建一张表 h5_resource_cache ，用来保存所有解压缩出来的文件数据。</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: center">field</th>
+      <th style="text-align: center">type</th>
+      <th style="text-align: center">comment</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: center">id</td>
+      <td style="text-align: center">int</td>
+      <td style="text-align: center">id</td>
+    </tr>
+    <tr>
+      <td style="text-align: center">path</td>
+      <td style="text-align: center">varchar</td>
+      <td style="text-align: center">文件在 zip 包中的路径</td>
+    </tr>
+    <tr>
+      <td style="text-align: center">url</td>
+      <td style="text-align: center">varchar</td>
+      <td style="text-align: center">文件的下载地址</td>
+    </tr>
+    <tr>
+      <td style="text-align: center">md5</td>
+      <td style="text-align: center">varchar</td>
+      <td style="text-align: center">文件的 md5 值</td>
+    </tr>
+    <tr>
+      <td style="text-align: center">create_time</td>
+      <td style="text-align: center">datetime</td>
+      <td style="text-align: center">创建时间</td>
+    </tr>
+    <tr>
+      <td style="text-align: center">update_time</td>
+      <td style="text-align: center">datetime</td>
+      <td style="text-align: center">更新时间</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>比如，zip 包中有一个文件为 /h5/login/html/index.html ，那么表中就有一条对应的数据</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: center">field</th>
+      <th style="text-align: center">value</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: center">id</td>
+      <td style="text-align: center">1</td>
+    </tr>
+    <tr>
+      <td style="text-align: center">path</td>
+      <td style="text-align: center">/h5/login/html/index.html</td>
+    </tr>
+    <tr>
+      <td style="text-align: center">url</td>
+      <td style="text-align: center">http://www.91chengguo.com/h5/login/html/index.html</td>
+    </tr>
+    <tr>
+      <td style="text-align: center">md5</td>
+      <td style="text-align: center">378f4280c25e9e58f0a268840ce6edee</td>
+    </tr>
+    <tr>
+      <td style="text-align: center">create_time</td>
+      <td style="text-align: center">2019-07-10 15:25:55</td>
+    </tr>
+    <tr>
+      <td style="text-align: center">update_time</td>
+      <td style="text-align: center">2019-07-10 15:25:55</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>后续 H5 页面如果有更新，重新上传最新的 zip 包即可。每个资源文件的版本都是交由它的 md5 值来控制，不需要开发人员人为控制。</p>
+
+<p>另外，服务端还会保存 zip 包的 md5 值，当作整体的 global version ，方便和移动端比较，后续在更新资源文件接口中会讲到。</p>
+
+<p><strong>下载 zip 接口</strong></p>
+
+<p>下载 zip 接口是上传 zip 的逆操作，不同点在于下载 zip 时，zip 包中所有文件的命名会包含 md5 值。比如原来 index.html 文件会被重新命名为 index.html?378f4280c25e9e58f0a268840ce6edee</p>
+
+<p><strong>更新资源文件接口</strong></p>
+
+<p>移动端调用此接口来维护后期的资源文件更新下载。</p>
+
+<p>请求参数：</p>
+
+<ul>
+  <li>
+    <p>version ：移动端本地静态资源文件的 global version</p>
+
+    <div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>  {
+      "version":"c7d6d754d80d2cdd1ee96e9d5ba8c186"
+  }
+</code></pre></div>    </div>
+  </li>
+</ul>
+
+<p>响应参数：</p>
+
+<ul>
+  <li>latestVersion ：最新的静态资源文件 global version ;</li>
+  <li>needUpdate ：是否需要更新;</li>
+  <li>
+    <p>resourceList ：所有的静态资源文件列表。需要注意的是，这里的 url 后面是带有文件 md5 值;</p>
+
+    <div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>  {
+      "latestVersion": "c34895364072b73edb10136a3db47f0c",
+      "needUpdate": true,
+      "resourceList": [{
+              "path": "/h5/login/html/index.html",
+              "md5": "378f4280c25e9e58f0a268840ce6edee",
+              "url": "http://www.91chengguo.com/h5/login/html/index.html?v=378f4280c25e9e58f0a268840ce6edee"
+          },
+          {
+              "path": "/h5/login/js/index.js",
+              "md5": "97f0337af05bf3e3f130da20e58565ed",
+              "url": "http://www.91chengguo.com/h5/login/js/index.js?v=97f0337af05bf3e3f130da20e58565ed"
+          },
+          {
+              "path": "/h5/login/css/index.css",
+              "md5": "bc88d1d7d37d71c470342292bae3381c",
+              "url": "http://www.91chengguo.com/h5/login/css/index.css?v=bc88d1d7d37d71c470342292bae3381c"
+          },
+          ...
+      ]
+  }
+</code></pre></div>    </div>
+  </li>
+</ul>
+
+<h1 id="移动端">移动端</h1>
+<p>移动端的工作在大方向上可以分为三步：</p>
+
+<ul>
+  <li>初始化，解压 H5 资源文件 zip 包；</li>
+  <li>对 H5 静态资源文件的维护和更新；</li>
+  <li>拦截符合要求的 WebView 请求，然后返回对应的本地静态资源文件流；</li>
+</ul>
+
+<p>下面的介绍以 Android 端的代码为例，基于 <a href="https://github.com/ReactiveX/RxJava">RxJava</a> 实现。</p>
+
+<p><strong>初始化</strong></p>
+
+<p>之前提到过，移动端 App 在安装包中会事先预置一份最新的 H5 静态资源文件 zip 包。当第一次打开或者版本升级时，就会去解压该 zip 包。除此之外，还有一份 zip 包中所有文件一一对应的配置文件，和服务端更新资源文件接口返回的数据格式很类似。例如：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>{
+	"version": "981b2b3e79af4f84b09f98858d2e9b79",
+	"resourceList": [{
+		"path": "/h5/login/js/index.js",
+		"md5": "7a2b958ae9978b1abd6209e0ffce049c"
+	},
+	...
+	]
+}
+</code></pre></div></div>
+
+<p>接下来，就是初始化的代码。<code class="highlighter-rouge">H5CacheManager.init</code> 方法会在 <code class="highlighter-rouge">Application.onCreate()</code> 中被调用。</p>
+
+<div class="language-kotlin highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kd">object</span> <span class="nc">H5CacheManager</span> <span class="p">{</span>
+
+	<span class="k">fun</span> <span class="nf">init</span><span class="p">(</span><span class="nv">ctx</span><span class="p">:</span> <span class="nc">Context</span><span class="p">)</span> <span class="p">{</span>
+	    <span class="kd">val</span> <span class="py">context</span> <span class="p">=</span> <span class="n">ctx</span><span class="p">.</span><span class="n">applicationContext</span>
+	    <span class="c1">// 静态资源文件保存路径 /data/data/com.orange.note/files/h5cache</span>
+	    <span class="n">cachePathDir</span> <span class="p">=</span> <span class="s">"${context.filesDir}/h5cache"</span>
+	    <span class="c1">// 读取 SharedPreference 中记录的 App 版本号</span>
+	    <span class="kd">val</span> <span class="py">versionCode</span> <span class="p">=</span> <span class="n">SharedPreferenceUtil</span><span class="p">.</span><span class="n">getInt</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="n">SP_H5_CACHE_VERSION_CODE</span><span class="p">,</span> <span class="n">DEFAULT_VERSION_CODE</span><span class="p">)</span>
+	    <span class="c1">// 当前 App 的版本号</span>
+	    <span class="kd">val</span> <span class="py">currentVersionCode</span> <span class="p">=</span> <span class="n">AppUtil</span><span class="p">.</span><span class="n">getVersionCode</span><span class="p">(</span><span class="n">context</span><span class="p">)</span>
+	    <span class="c1">// 第一次打开或者版本升级</span>
+	    <span class="k">if</span> <span class="p">(</span><span class="n">versionCode</span> <span class="p">==</span> <span class="n">DEFAULT_VERSION_CODE</span> <span class="p">||</span> <span class="n">currentVersionCode</span> <span class="p">&gt;</span> <span class="n">versionCode</span><span class="p">)</span> <span class="p">{</span>
+	        <span class="c1">// 解压 assets 中的 zip 包到 cachePathDir 中</span>
+	        <span class="n">unZipFromAssets</span><span class="p">(</span><span class="n">context</span><span class="p">)</span>
+	    <span class="p">}</span>
+	    <span class="c1">// 读取配置文件到内存中</span>
+	    <span class="n">readMappingFile</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="n">currentVersionCode</span><span class="p">)</span>
+	<span class="p">}</span>
+
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p><code class="highlighter-rouge">unZipFromAssets(context)</code> 方法比较简单，在这里就不过多讲解了。</p>
+
+<p>在 <code class="highlighter-rouge">readMappingFile(context, currentVersionCode)</code> 中主要做的事就是把配置文件中的数据读到内存中。</p>
+
+<div class="language-kotlin highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">private</span> <span class="k">fun</span> <span class="nf">readMappingFile</span><span class="p">(</span><span class="nv">context</span><span class="p">:</span> <span class="nc">Context</span><span class="p">,</span> <span class="nv">versionCode</span><span class="p">:</span> <span class="nc">Int</span><span class="p">)</span> <span class="p">{</span>
+    <span class="c1">// 配置文件</span>
+    <span class="kd">val</span> <span class="py">file</span> <span class="p">=</span> <span class="n">File</span><span class="p">(</span><span class="n">cachePathDir</span> <span class="p">+</span> <span class="n">File</span><span class="p">.</span><span class="n">separator</span> <span class="p">+</span> <span class="n">H5_CACHE_JSON</span><span class="p">)</span>
+    <span class="n">Observable</span><span class="p">.</span><span class="n">just</span><span class="p">(</span><span class="n">file</span><span class="p">)</span>
+        <span class="p">.</span><span class="n">observeOn</span><span class="p">(</span><span class="n">Schedulers</span><span class="p">.</span><span class="n">io</span><span class="p">())</span>
+        <span class="p">.</span><span class="n">map</span> <span class="p">{</span>
+            <span class="c1">// 如果配置文件存在，直接读取；否则从 assets 中复制过来读取</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">file</span><span class="p">.</span><span class="n">isFile</span> <span class="p">&amp;&amp;</span> <span class="n">file</span><span class="p">.</span><span class="n">exists</span><span class="p">())</span> <span class="p">{</span>
+                <span class="k">return</span><span class="nd">@map</span> <span class="n">file</span><span class="p">.</span><span class="n">readText</span><span class="p">()</span>
+            <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+                <span class="kd">val</span> <span class="py">input</span> <span class="p">=</span> <span class="n">context</span><span class="p">.</span><span class="n">resources</span><span class="p">.</span><span class="n">assets</span><span class="p">.</span><span class="k">open</span><span class="p">(</span><span class="n">H5_CACHE_JSON</span><span class="p">)</span>
+                <span class="kd">val</span> <span class="py">filePath</span> <span class="p">=</span> <span class="s">"$cachePathDir/$H5_CACHE_JSON"</span>
+                <span class="kd">val</span> <span class="py">saveFile</span> <span class="p">=</span> <span class="n">FileUtil</span><span class="p">.</span><span class="n">saveFile</span><span class="p">(</span><span class="n">input</span><span class="p">,</span> <span class="n">filePath</span><span class="p">)</span>
+                <span class="k">return</span><span class="nd">@map</span> <span class="n">saveFile</span><span class="p">.</span><span class="n">readText</span><span class="p">()</span>
+            <span class="p">}</span>
+        <span class="p">}</span>
+        <span class="p">.</span><span class="n">map</span> <span class="p">{</span>
+            <span class="c1">// 然后把内容读取到 cacheMapping 中</span>
+            <span class="c1">// cacheMapping 是一个 ConcurrentHashMap 对象</span>
+            <span class="c1">// 比如 key = /h5/login/js/index.js , value = 7a2b958ae9978b1abd6209e0ffce049c</span>
+            <span class="kd">val</span> <span class="py">h5Cache</span> <span class="p">=</span> <span class="n">GsonUtil</span><span class="p">.</span><span class="n">fromJson</span><span class="p">(</span><span class="n">it</span><span class="p">,</span> <span class="n">H5CacheMapping</span><span class="o">::</span><span class="k">class</span><span class="p">.</span><span class="n">java</span><span class="p">)</span>
+            <span class="n">version</span> <span class="p">=</span> <span class="n">h5Cache</span><span class="p">.</span><span class="n">version</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">h5Cache</span><span class="p">.</span><span class="n">resourceList</span><span class="o">?.</span><span class="n">isNotEmpty</span><span class="p">()</span> <span class="p">==</span> <span class="k">true</span><span class="p">)</span> <span class="p">{</span>
+                <span class="n">h5Cache</span><span class="p">.</span><span class="n">resourceList</span><span class="o">!!</span><span class="p">.</span><span class="n">forEach</span> <span class="p">{</span> <span class="n">item</span> <span class="p">-&gt;</span>
+                    <span class="n">cacheMapping</span><span class="p">[</span><span class="n">item</span><span class="p">.</span><span class="n">path</span><span class="p">]</span> <span class="p">=</span> <span class="n">item</span><span class="p">.</span><span class="n">md5</span>
+                <span class="p">}</span>
+            <span class="p">}</span>
+        <span class="p">}</span>
+        <span class="p">.</span><span class="n">subscribe</span><span class="p">(</span><span class="kd">object</span> <span class="err">: </span><span class="nc">Subscriber</span><span class="p">&lt;</span><span class="n">Unit</span><span class="p">&gt;()</span> <span class="p">{</span>
+            <span class="k">override</span> <span class="k">fun</span> <span class="nf">onNext</span><span class="p">(</span><span class="nv">t</span><span class="p">:</span> <span class="nc">Unit</span><span class="p">?)</span> <span class="p">{</span>
+                <span class="n">SharedPreferenceUtil</span><span class="p">.</span><span class="n">put</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="n">SP_H5_CACHE_VERSION_CODE</span><span class="p">,</span> <span class="n">versionCode</span><span class="p">)</span>
+            <span class="p">}</span>
+
+            <span class="k">override</span> <span class="k">fun</span> <span class="nf">onCompleted</span><span class="p">()</span> <span class="p">{</span>
+                <span class="n">unsubscribe</span><span class="p">()</span>
+            <span class="p">}</span>
+
+            <span class="k">override</span> <span class="k">fun</span> <span class="nf">onError</span><span class="p">(</span><span class="nv">e</span><span class="p">:</span> <span class="nc">Throwable</span><span class="p">?)</span> <span class="p">{</span>
+                <span class="n">e</span><span class="o">?.</span><span class="n">printStackTrace</span><span class="p">()</span>
+                <span class="n">SharedPreferenceUtil</span><span class="p">.</span><span class="n">put</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="n">SP_H5_CACHE_VERSION_CODE</span><span class="p">,</span> <span class="n">DEFAULT_VERSION_CODE</span><span class="p">)</span>
+                <span class="n">unsubscribe</span><span class="p">()</span>
+            <span class="p">}</span>
+        <span class="p">})</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p><strong>资源文件更新</strong></p>
+
+<p>当用户打开 App 后，会定时向服务端检查是否有新的资源文件需要更新。在这里我们就以五分钟检查一次为准。</p>
+
+<p>直接来看代码：</p>
+
+<div class="language-kotlin highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">fun</span> <span class="nf">checkUpdateInterval</span><span class="p">()</span> <span class="p">{</span>
+    <span class="n">Observable</span><span class="p">.</span><span class="n">interval</span><span class="p">(</span><span class="m">0</span><span class="p">,</span> <span class="m">5</span> <span class="p">*</span> <span class="m">60</span><span class="p">,</span> <span class="n">TimeUnit</span><span class="p">.</span><span class="n">SECONDS</span><span class="p">)</span>
+        <span class="p">.</span><span class="n">subscribeOn</span><span class="p">(</span><span class="n">Schedulers</span><span class="p">.</span><span class="n">io</span><span class="p">())</span>
+        <span class="p">.</span><span class="n">subscribe</span><span class="p">(</span><span class="kd">object</span> <span class="err">: </span><span class="nc">Subscriber</span><span class="p">&lt;</span><span class="n">Long</span><span class="p">&gt;()</span> <span class="p">{</span>
+
+            <span class="k">override</span> <span class="k">fun</span> <span class="nf">onNext</span><span class="p">(</span><span class="nv">t</span><span class="p">:</span> <span class="nc">Long</span><span class="p">?)</span> <span class="p">{</span>
+                <span class="n">checkUpdate</span><span class="p">()</span>
+            <span class="p">}</span>
+
+            <span class="k">override</span> <span class="k">fun</span> <span class="nf">onCompleted</span><span class="p">()</span> <span class="p">{</span>
+            <span class="p">}</span>
+
+            <span class="k">override</span> <span class="k">fun</span> <span class="nf">onError</span><span class="p">(</span><span class="nv">e</span><span class="p">:</span> <span class="nc">Throwable</span><span class="p">?)</span> <span class="p">{</span>
+                <span class="n">e</span><span class="o">?.</span><span class="n">printStackTrace</span><span class="p">()</span>
+            <span class="p">}</span>
+
+        <span class="p">})</span>
+<span class="p">}</span>
+
+<span class="k">fun</span> <span class="nf">checkUpdate</span><span class="p">()</span> <span class="p">{</span>
+    <span class="c1">// 这里会去调用服务端的更新资源文件接口</span>
+    <span class="n">H5CacheTask</span><span class="p">.</span><span class="n">checkUpdate</span><span class="p">(</span><span class="n">version</span><span class="p">)</span>
+        <span class="p">.</span><span class="n">observeOn</span><span class="p">(</span><span class="n">Schedulers</span><span class="p">.</span><span class="n">io</span><span class="p">())</span>
+        <span class="p">.</span><span class="n">filter</span> <span class="p">{</span>
+            <span class="k">return</span><span class="nd">@filter</span> <span class="n">it</span><span class="p">.</span><span class="n">needUpdate</span>
+        <span class="p">}</span>
+        <span class="p">.</span><span class="n">flatMap</span> <span class="p">{</span>
+            <span class="k">return</span><span class="nd">@flatMap</span> <span class="n">Observable</span><span class="p">.</span><span class="n">from</span><span class="p">(</span><span class="n">it</span><span class="p">.</span><span class="n">resourceList</span><span class="p">)</span>
+                <span class="p">.</span><span class="n">flatMap</span> <span class="k">inner</span><span class="err">@</span><span class="p">{</span> <span class="n">item</span> <span class="p">-&gt;</span>
+                    <span class="kd">val</span> <span class="py">file</span> <span class="p">=</span> <span class="n">File</span><span class="p">(</span><span class="s">"$cachePathDir${item.path}?v=${item.md5}"</span><span class="p">)</span>
+                    <span class="c1">// 如果文件存在并且md5一致，就不用重新下载了</span>
+                    <span class="k">if</span> <span class="p">(</span><span class="n">file</span><span class="p">.</span><span class="n">exists</span><span class="p">()</span> <span class="p">&amp;&amp;</span> <span class="n">file</span><span class="p">.</span><span class="n">isFile</span> <span class="p">&amp;&amp;</span> <span class="n">MD5Util</span><span class="p">.</span><span class="n">md5</span><span class="p">(</span><span class="n">file</span><span class="p">).</span><span class="n">toLowerCase</span><span class="p">()</span> <span class="p">==</span> <span class="n">item</span><span class="p">.</span><span class="n">md5</span><span class="o">?.</span><span class="n">toLowerCase</span><span class="p">())</span> <span class="p">{</span>
+                        <span class="k">return</span><span class="nd">@inner</span> <span class="n">Observable</span><span class="p">.</span><span class="n">just</span><span class="p">(</span><span class="k">true</span><span class="p">)</span>
+                    <span class="p">}</span>
+                    <span class="c1">// 否则就去下载</span>
+                    <span class="k">return</span><span class="nd">@inner</span> <span class="n">H5CacheTask</span><span class="p">.</span><span class="n">download</span><span class="p">(</span><span class="n">item</span><span class="p">.</span><span class="n">url</span><span class="o">!!</span><span class="p">)</span>
+                        <span class="p">.</span><span class="n">map</span> <span class="p">{</span> <span class="n">body</span> <span class="p">-&gt;</span>
+                            <span class="kd">val</span> <span class="py">uri</span> <span class="p">=</span> <span class="n">URI</span><span class="p">(</span><span class="n">item</span><span class="p">.</span><span class="n">url</span><span class="p">)</span>
+                            <span class="c1">// 注意：这里文件保存时会把后面的 ?v=xxxx 一起作为文件名</span>
+                            <span class="kd">val</span> <span class="py">path</span> <span class="p">=</span> <span class="n">item</span><span class="p">.</span><span class="n">url</span><span class="p">.</span><span class="n">replace</span><span class="p">(</span><span class="s">"${uri.scheme}://${uri.host}"</span><span class="p">,</span> <span class="s">""</span><span class="p">)</span>
+                            <span class="c1">// 比如：文件路径为 /data/data/com.orange.note/files/h5cache/h5/login/js/index.js?v=7a2b958ae9978b1abd6209e0ffce049c</span>
+                            <span class="k">return</span><span class="nd">@map</span> <span class="n">FileUtil</span><span class="p">.</span><span class="n">saveFile</span><span class="p">(</span><span class="n">body</span><span class="p">.</span><span class="n">byteStream</span><span class="p">(),</span> <span class="n">cachePathDir</span> <span class="p">+</span> <span class="n">path</span><span class="p">)</span>
+                        <span class="p">}</span>
+                        <span class="p">.</span><span class="n">map</span> <span class="p">{</span> <span class="n">newFile</span> <span class="p">-&gt;</span>
+                            <span class="c1">// 如果文件下载成功后，检查 md5 值</span>
+                            <span class="k">if</span> <span class="p">(</span><span class="n">item</span><span class="p">.</span><span class="n">md5</span><span class="o">?.</span><span class="n">toLowerCase</span><span class="p">()</span> <span class="p">==</span> <span class="n">MD5Util</span><span class="p">.</span><span class="n">md5</span><span class="p">(</span><span class="n">newFile</span><span class="p">).</span><span class="n">toLowerCase</span><span class="p">())</span> <span class="p">{</span>
+                                <span class="k">return</span><span class="nd">@map</span> <span class="k">true</span>
+                            <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+                                <span class="n">newFile</span><span class="p">.</span><span class="n">delete</span><span class="p">()</span>
+                                <span class="k">return</span><span class="nd">@map</span> <span class="k">false</span>
+                            <span class="p">}</span>
+                        <span class="p">}</span>
+                        <span class="p">.</span><span class="n">onErrorReturn</span> <span class="p">{</span>
+                            <span class="k">return</span><span class="nd">@onErrorReturn</span> <span class="k">false</span>
+                        <span class="p">}</span>
+                        <span class="p">.</span><span class="n">doOnNext</span> <span class="p">{</span>
+                            <span class="c1">// 更新内存 cacheMapping</span>
+                            <span class="n">cacheMapping</span><span class="p">[</span><span class="n">item</span><span class="p">.</span><span class="n">path</span><span class="p">]</span> <span class="p">=</span> <span class="n">item</span><span class="p">.</span><span class="n">md5</span>
+                        <span class="p">}</span>
+                <span class="p">}</span>
+                <span class="p">.</span><span class="n">toList</span><span class="p">()</span>
+                <span class="p">.</span><span class="n">flatMap</span> <span class="k">inner</span><span class="err">@</span><span class="p">{</span> <span class="n">list</span> <span class="p">-&gt;</span>
+                    <span class="c1">// 如果其中有某些资源文件下载失败了，就抛出DownloadErrorException</span>
+                    <span class="k">return</span><span class="nd">@inner</span> <span class="k">if</span> <span class="p">(</span><span class="n">list</span><span class="p">.</span><span class="n">contains</span><span class="p">(</span><span class="k">false</span><span class="p">))</span>
+                        <span class="n">Observable</span><span class="p">.</span><span class="n">error</span><span class="p">&lt;</span><span class="n">H5CacheResponse</span><span class="p">&gt;(</span><span class="n">DownloadErrorException</span><span class="p">(</span><span class="s">"something download failed"</span><span class="p">))</span>
+                    <span class="k">else</span>
+                        <span class="n">Observable</span><span class="p">.</span><span class="n">just</span><span class="p">(</span><span class="n">it</span><span class="p">)</span>
+                <span class="p">}</span>
+        <span class="p">}</span>
+        <span class="p">.</span><span class="n">subscribe</span><span class="p">(</span><span class="kd">object</span> <span class="err">: </span><span class="nc">Subscriber</span><span class="p">&lt;</span><span class="n">H5CacheResponse</span><span class="p">&gt;()</span> <span class="p">{</span>
+
+            <span class="k">override</span> <span class="k">fun</span> <span class="nf">onNext</span><span class="p">(</span><span class="nv">t</span><span class="p">:</span> <span class="nc">H5CacheResponse</span><span class="p">?)</span> <span class="p">{</span>
+                <span class="c1">// 如果全部下载成功了，就更新磁盘上的配置文件</span>
+                <span class="k">if</span> <span class="p">(</span><span class="n">t</span><span class="o">?.</span><span class="n">needUpdate</span> <span class="p">==</span> <span class="k">true</span><span class="p">)</span> <span class="p">{</span>
+                    <span class="c1">// 更新 global version</span>
+                    <span class="n">version</span> <span class="p">=</span> <span class="n">t</span><span class="p">.</span><span class="n">latestVersion</span>
+                    <span class="kd">val</span> <span class="py">h5CacheMapping</span> <span class="p">=</span> <span class="n">H5CacheMapping</span><span class="p">(</span><span class="n">t</span><span class="p">.</span><span class="n">latestVersion</span><span class="p">,</span> <span class="n">t</span><span class="p">.</span><span class="n">resourceList</span><span class="p">)</span>
+                    <span class="kd">val</span> <span class="py">json</span> <span class="p">=</span> <span class="n">GsonUtil</span><span class="p">.</span><span class="n">toJson</span><span class="p">(</span><span class="n">h5CacheMapping</span><span class="p">)</span>
+                    <span class="kd">val</span> <span class="py">file</span> <span class="p">=</span> <span class="n">File</span><span class="p">(</span><span class="n">cachePathDir</span> <span class="p">+</span> <span class="n">File</span><span class="p">.</span><span class="n">separator</span> <span class="p">+</span> <span class="n">H5_CACHE_JSON</span><span class="p">)</span>
+                    <span class="n">file</span><span class="p">.</span><span class="n">writeText</span><span class="p">(</span><span class="n">URLDecoder</span><span class="p">.</span><span class="n">decode</span><span class="p">(</span><span class="n">json</span><span class="p">,</span> <span class="s">"UTF-8"</span><span class="p">))</span>
+                <span class="p">}</span>
+            <span class="p">}</span>
+
+            <span class="k">override</span> <span class="k">fun</span> <span class="nf">onCompleted</span><span class="p">()</span> <span class="p">{</span>
+                <span class="n">unsubscribe</span><span class="p">()</span>
+            <span class="p">}</span>
+
+            <span class="k">override</span> <span class="k">fun</span> <span class="nf">onError</span><span class="p">(</span><span class="nv">e</span><span class="p">:</span> <span class="nc">Throwable</span><span class="p">?)</span> <span class="p">{</span>
+                <span class="n">e</span><span class="o">?.</span><span class="n">printStackTrace</span><span class="p">()</span>
+                <span class="c1">// 如果有下载失败的情况，也更新配置文件，直接读取 cacheMapping 来构造 resourceList 列表</span>
+                <span class="c1">// 但是需要注意的是，global version 仍然是旧的，不是最新的，方便下次再更新</span>
+                <span class="k">if</span> <span class="p">(</span><span class="n">e</span> <span class="k">is</span> <span class="n">DownloadErrorException</span><span class="p">)</span> <span class="p">{</span>
+                    <span class="kd">val</span> <span class="py">h5List</span> <span class="p">=</span> <span class="n">mutableListOf</span><span class="p">&lt;</span><span class="n">H5CacheItem</span><span class="p">&gt;()</span>
+                    <span class="n">cacheMapping</span><span class="p">.</span><span class="n">forEach</span> <span class="p">{</span>
+                        <span class="kd">val</span> <span class="py">item</span> <span class="p">=</span> <span class="n">H5CacheItem</span><span class="p">(</span><span class="n">it</span><span class="p">.</span><span class="n">key</span><span class="p">,</span> <span class="n">it</span><span class="p">.</span><span class="n">value</span><span class="p">)</span>
+                        <span class="n">h5List</span><span class="p">.</span><span class="n">add</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
+                    <span class="p">}</span>
+                    <span class="c1">// global version will not change</span>
+                    <span class="kd">val</span> <span class="py">h5CacheMapping</span> <span class="p">=</span> <span class="n">H5CacheMapping</span><span class="p">(</span><span class="n">version</span><span class="p">,</span> <span class="n">h5List</span><span class="p">)</span>
+                    <span class="kd">val</span> <span class="py">json</span> <span class="p">=</span> <span class="n">GsonUtil</span><span class="p">.</span><span class="n">toJson</span><span class="p">(</span><span class="n">h5CacheMapping</span><span class="p">)</span>
+                    <span class="kd">val</span> <span class="py">file</span> <span class="p">=</span> <span class="n">File</span><span class="p">(</span><span class="n">cachePathDir</span> <span class="p">+</span> <span class="n">File</span><span class="p">.</span><span class="n">separator</span> <span class="p">+</span> <span class="n">H5_CACHE_JSON</span><span class="p">)</span>
+                    <span class="n">file</span><span class="p">.</span><span class="n">writeText</span><span class="p">(</span><span class="n">URLDecoder</span><span class="p">.</span><span class="n">decode</span><span class="p">(</span><span class="n">json</span><span class="p">,</span> <span class="s">"UTF-8"</span><span class="p">))</span>
+                <span class="p">}</span>
+                <span class="n">unsubscribe</span><span class="p">()</span>
+            <span class="p">}</span>
+
+        <span class="p">})</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p><strong>拦截 WebView 请求</strong></p>
+
+<p>重写 <code class="highlighter-rouge">WebViewClient.shouldInterceptRequest</code> 进行拦截，根据 url 来判断是否需要读取缓存文件流。</p>
+
+<p>具体的流程可以参考下图：</p>
+
+<p><img src="/img/2019/07/android-h5-cache.jpg" alt="流程图" /></p>
+
+<p>举个例子，比如现在拦截到 http://www.91chengguo.com/h5/login/js/index.js 。我们获取 url 的 path :</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>/h5/login/js/index.js
+</code></pre></div></div>
+
+<p>然后去 cacheMapping 中查找是否有包含这个 key 。如果包含的话，从 cacheMapping 中获取对应的 md5 值。那么在磁盘上再去查找是否有以下路径的资源文件存在：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>/data/data/com.orange.note/h5cache/h5/login/js/index.js?v=7a2b958ae9978b1abd6209e0ffce049c
+</code></pre></div></div>
+
+<p>如果文件存在并且 md5 值一致，就证明找到了资源文件缓存。读取文件流并构造 WebResourceResponse 对象返回。</p>
+
+<p>相关代码：</p>
+
+<div class="language-kotlin highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kd">object</span> <span class="nc">H5CacheInterceptor</span> <span class="p">{</span>
+
+	<span class="k">fun</span> <span class="nf">shouldInterceptRequest</span><span class="p">(</span><span class="nv">url</span><span class="p">:</span> <span class="nc">String</span><span class="p">?):</span> <span class="nc">WebResourceResponse</span><span class="p">?</span> <span class="p">{</span>
+	    <span class="k">if</span> <span class="p">(</span><span class="n">TextUtils</span><span class="p">.</span><span class="n">isEmpty</span><span class="p">(</span><span class="n">url</span><span class="p">))</span> <span class="p">{</span>
+	        <span class="k">return</span> <span class="k">null</span>
+	    <span class="p">}</span>
+	    <span class="kd">val</span> <span class="py">uri</span> <span class="p">=</span> <span class="n">URI</span><span class="p">(</span><span class="n">url</span><span class="o">!!</span><span class="p">)</span>
+	    <span class="c1">// 判断 url 的 host 是否是我们需要拦截的</span>
+	    <span class="k">if</span> <span class="p">(!</span><span class="n">hostSet</span><span class="p">.</span><span class="n">contains</span><span class="p">(</span><span class="n">uri</span><span class="p">.</span><span class="n">host</span><span class="p">))</span> <span class="p">{</span>
+	        <span class="k">return</span> <span class="k">null</span>
+	    <span class="p">}</span>
+	    <span class="kd">var</span> <span class="py">path</span> <span class="p">=</span> <span class="n">uri</span><span class="p">.</span><span class="n">path</span>
+	    <span class="k">if</span> <span class="p">(!</span><span class="n">H5CacheManager</span><span class="p">.</span><span class="n">cacheMapping</span><span class="p">.</span><span class="n">containsKey</span><span class="p">(</span><span class="n">path</span><span class="p">))</span> <span class="p">{</span>
+	        <span class="k">return</span> <span class="k">null</span>
+	    <span class="p">}</span>
+	    
+	    <span class="kd">val</span> <span class="py">md5</span> <span class="p">=</span> <span class="n">H5CacheManager</span><span class="p">.</span><span class="n">cacheMapping</span><span class="p">[</span><span class="n">path</span><span class="p">]</span> <span class="o">?:</span> <span class="s">""</span>
+	    <span class="k">if</span> <span class="p">(</span><span class="n">TextUtils</span><span class="p">.</span><span class="n">isEmpty</span><span class="p">(</span><span class="n">md5</span><span class="p">))</span> <span class="p">{</span>
+	        <span class="k">return</span> <span class="k">null</span>
+	    <span class="p">}</span>
+	    <span class="n">path</span> <span class="p">=</span> <span class="s">"$path?v=$md5"</span>
+	    <span class="kd">val</span> <span class="py">file</span> <span class="p">=</span> <span class="n">File</span><span class="p">(</span><span class="n">H5CacheManager</span><span class="p">.</span><span class="n">cachePathDir</span> <span class="p">+</span> <span class="n">path</span><span class="p">)</span>
+	    <span class="k">if</span> <span class="p">(!</span><span class="n">file</span><span class="p">.</span><span class="n">exists</span><span class="p">()</span> <span class="p">||</span> <span class="p">!</span><span class="n">file</span><span class="p">.</span><span class="n">isFile</span><span class="p">)</span> <span class="p">{</span>
+	        <span class="k">return</span> <span class="k">null</span>
+	    <span class="p">}</span>
+	    <span class="kd">val</span> <span class="py">fileMd5</span> <span class="p">=</span> <span class="n">MD5Util</span><span class="p">.</span><span class="n">md5</span><span class="p">(</span><span class="n">file</span><span class="p">)</span> <span class="o">?:</span> <span class="s">""</span>
+	    <span class="k">if</span> <span class="p">(</span><span class="n">fileMd5</span><span class="p">.</span><span class="n">toLowerCase</span><span class="p">()</span> <span class="p">!=</span> <span class="n">md5</span><span class="p">.</span><span class="n">toLowerCase</span><span class="p">())</span> <span class="p">{</span>
+	        <span class="k">return</span> <span class="k">null</span>
+	    <span class="p">}</span>
+	    <span class="c1">// 获取 url 对应的 mimeType</span>
+	    <span class="kd">val</span> <span class="py">mimeType</span> <span class="p">=</span> <span class="n">MimeTypeMapUtil</span><span class="p">.</span><span class="n">getMimeTypeFromUrl</span><span class="p">(</span><span class="n">url</span><span class="p">)</span> <span class="o">?:</span> <span class="s">""</span>
+	    <span class="kd">val</span> <span class="py">webResourceResponse</span> <span class="p">=</span> <span class="n">WebResourceResponse</span><span class="p">(</span><span class="n">mimeType</span><span class="p">,</span> <span class="s">""</span><span class="p">,</span> <span class="n">file</span><span class="p">.</span><span class="n">inputStream</span><span class="p">())</span>
+	
+	    <span class="k">if</span> <span class="p">(</span><span class="n">Build</span><span class="p">.</span><span class="n">VERSION</span><span class="p">.</span><span class="n">SDK_INT</span> <span class="p">&gt;=</span> <span class="n">Build</span><span class="p">.</span><span class="n">VERSION_CODES</span><span class="p">.</span><span class="n">LOLLIPOP</span><span class="p">)</span> <span class="p">{</span>
+	        <span class="n">webResourceResponse</span><span class="p">.</span><span class="n">setStatusCodeAndReasonPhrase</span><span class="p">(</span><span class="n">CODE_200</span><span class="p">,</span> <span class="n">MESSAGE_OK</span><span class="p">)</span>
+	    <span class="p">}</span>
+	    <span class="k">return</span> <span class="n">webResourceResponse</span>
+	<span class="p">}</span>
+	
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>使用方法：</p>
+
+<div class="language-kotlin highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">webView</span><span class="p">.</span><span class="n">webViewClient</span> <span class="p">=</span> <span class="kd">object</span> <span class="err">: </span><span class="nc">WebViewClient</span><span class="p">()</span> <span class="p">{</span>
+
+    <span class="nd">@TargetApi</span><span class="p">(</span><span class="n">Build</span><span class="p">.</span><span class="n">VERSION_CODES</span><span class="p">.</span><span class="n">LOLLIPOP</span><span class="p">)</span>
+    <span class="k">override</span> <span class="k">fun</span> <span class="nf">shouldInterceptRequest</span><span class="p">(</span><span class="nv">view</span><span class="p">:</span> <span class="nc">WebView</span><span class="p">?,</span> <span class="nv">request</span><span class="p">:</span> <span class="nc">WebResourceRequest</span><span class="p">?):</span> <span class="nc">WebResourceResponse</span><span class="p">?</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="n">H5CacheInterceptor</span><span class="p">.</span><span class="n">shouldInterceptRequest</span><span class="p">(</span><span class="n">request</span><span class="o">?.</span><span class="n">url</span><span class="p">.</span><span class="n">toString</span><span class="p">())</span> <span class="o">?:</span> <span class="k">super</span><span class="p">.</span><span class="n">shouldInterceptRequest</span><span class="p">(</span><span class="n">view</span><span class="p">,</span> <span class="n">request</span><span class="p">)</span>
+    <span class="p">}</span>
+
+    <span class="k">override</span> <span class="k">fun</span> <span class="nf">shouldInterceptRequest</span><span class="p">(</span><span class="nv">view</span><span class="p">:</span> <span class="nc">WebView</span><span class="p">?,</span> <span class="nv">url</span><span class="p">:</span> <span class="nc">String</span><span class="p">?):</span> <span class="nc">WebResourceResponse</span><span class="p">?</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="n">H5CacheInterceptor</span><span class="p">.</span><span class="n">shouldInterceptRequest</span><span class="p">(</span><span class="n">url</span><span class="p">)</span> <span class="o">?:</span> <span class="k">super</span><span class="p">.</span><span class="n">shouldInterceptRequest</span><span class="p">(</span><span class="n">view</span><span class="p">,</span> <span class="n">url</span><span class="p">)</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<h1 id="写在最后">写在最后</h1>
+<p>总体来说，H5 页面加速并不是仅仅依靠静态资源文件缓存就能大幅提升的。除此之外，橙果错题本还对 WebView 其他方面也做了一些优化：</p>
+
+<ul>
+  <li>开启 WebView 内置缓存；</li>
+  <li>WebView 使用 HTTPDNS 进行解析；</li>
+  <li>WebView 提前初始化，加快加载内核速度；</li>
+  <li>…</li>
+</ul>
+
+<p>如果您有更好的建议，欢迎来互相交流。</p>
+
+</div><footer class="article__footer"><meta itemprop="dateModified" content="2019-07-31T08:00:00+08:00"><!-- this will show at every article content's bottom --></footer>
+
+  <div class="d-print-none"></div>
+
+</div>
+
+<script>(function() {
+  var SOURCES = window.TEXT_VARIABLES.sources;
+  window.Lazyload.js(SOURCES.jquery, function() {
+    $(function() {
+      var $this ,$scroll;
+      var $articleContent = $('.js-article-content');
+      var hasSidebar = $('.js-page-root').hasClass('layout--page--sidebar');
+      var scroll = hasSidebar ? '.js-page-main' : 'html, body';
+      $scroll = $(scroll);
+
+      $articleContent.find('.highlight').each(function() {
+        $this = $(this);
+        $this.attr('data-lang', $this.find('code').attr('data-lang'));
+      });
+      $articleContent.find('h1[id], h2[id], h3[id], h4[id], h5[id], h6[id]').each(function() {
+        $this = $(this);
+        $this.append($('<a class="anchor d-print-none" aria-hidden="true"></a>').html('<i class="fas fa-anchor"></i>'));
+      });
+      $articleContent.on('click', '.anchor', function() {
+        $scroll.scrollToAnchor('#' + $(this).parent().attr('id'), 400);
+      });
+    });
+  });
+})();</script></div><section class="page__comments d-print-none"></section></article>
+              </div>
+            </div></div></div><div class="page__footer d-print-none">
+<div class="footer js-page-footer">
+  <div class="main"><aside  itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content=""><meta itemprop="url" content="/"><div class="footer__author-links"><div class="author-links">
+  <ul class="menu menu--nowrap menu--inline"></ul>
+</div>
+</div>
+    </aside>
+    <footer class="site-info"><p class="menu menu--center">
+        <span>© 杭州数橙科技 2018</span>
+        <a type="application/rss+xml" href="/feed.xml">RSS</a>
+      </p>
+      <p>Powered by <a title="Jekyll is a simple, blog-aware, static site generator." href="http://jekyllrb.com/">Jekyll</a> & <a
+        title="TeXt is a succinct theme for blogging." href="https://github.com/kitian616/jekyll-TeXt-theme">TeXt Theme</a>.
+      </p>
+    </footer>
+  </div>
+</div></div></div>
+    </div><div class="modal modal--overflow page__search-modal d-print-none js-page-search-modal"><div class="search search--dark">
+  <div class="main">
+    <div class="search__header">搜索</div>
+    <div class="search-bar">
+      <div class="search-box js-search-box">
+        <div class="search-box__icon-search"><i class="fas fa-search"></i></div>
+        <input type="text" />
+        <div class="search-box__icon-clear js-icon-clear">
+          <a><i class="fas fa-times"></i></a>
+        </div>
+      </div>
+      <button class="button button--theme-dark button--pill search__cancel js-search-toggle">
+        取消</button>
+    </div>
+    <div class="search-result js-search-result"></div>
+  </div>
+</div></div></div>
+
+
+<script>(function() {
+  var SOURCES = window.TEXT_VARIABLES.sources;
+  window.Lazyload.js(SOURCES.jquery, function() {
+    function scrollToAnchor(anchor, duration, callback) {
+      var $root = this;
+      $root.animate({ scrollTop: $(anchor).position().top }, duration, function() {
+        window.history.replaceState(null, '', window.location.href.split('#')[0] + anchor);
+        callback && callback();
+      });
+    }
+    $.fn.scrollToAnchor = scrollToAnchor;
+  });
+})();(function() {
+  var SOURCES = window.TEXT_VARIABLES.sources;
+  window.Lazyload.js(SOURCES.jquery, function() {
+    function affix(options) {
+      var $root = this, $window = $(window), $scrollTarget, $scroll,
+        offsetBottom = 0, scrollTarget = window, scroll = window.document, disabled = false, isOverallScroller = true,
+        rootTop, rootLeft, rootHeight, scrollBottom, rootBottomTop,
+        hasInit = false, curState;
+
+      function setOptions(options) {
+        var _options = options || {};
+        _options.offsetBottom && (offsetBottom = _options.offsetBottom);
+        _options.scrollTarget && (scrollTarget = _options.scrollTarget);
+        _options.scroll && (scroll = _options.scroll);
+        _options.disabled !== undefined && (disabled = _options.disabled);
+        $scrollTarget = $(scrollTarget);
+        isOverallScroller = window.isOverallScroller($scrollTarget[0]);
+        $scroll = $(scroll);
+      }
+      function preCalc() {
+        top();
+        rootHeight = $root.outerHeight();
+        rootTop = $root.offset().top + (isOverallScroller ? 0 :  $scrollTarget.scrollTop());
+        rootLeft = $root.offset().left;
+      }
+      function calc(needPreCalc) {
+        needPreCalc && preCalc();
+        scrollBottom = $scroll.outerHeight() - offsetBottom - rootHeight;
+        rootBottomTop = scrollBottom - rootTop;
+      }
+      function top() {
+        if (curState !== 'top') {
+          $root.removeClass('fixed').css({
+            left: 0,
+            top: 0
+          });
+          curState = 'top';
+        }
+      }
+      function fixed() {
+        if (curState !== 'fixed') {
+          $root.addClass('fixed').css({
+            left: rootLeft + 'px',
+            top: 0
+          });
+          curState = 'fixed';
+        }
+      }
+      function bottom() {
+        if (curState !== 'bottom') {
+          $root.removeClass('fixed').css({
+            left: 0,
+            top: rootBottomTop + 'px'
+          });
+          curState = 'bottom';
+        }
+      }
+      function setState() {
+        var scrollTop = $scrollTarget.scrollTop();
+        if (scrollTop >= rootTop && scrollTop <= scrollBottom) {
+          fixed();
+        } else if (scrollTop < rootTop) {
+          top();
+        } else {
+          bottom();
+        }
+      }
+      function init() {
+        if(!hasInit) {
+          var interval, timeout;
+          calc(true); setState();
+          // run calc every 100 millisecond
+          interval = setInterval(function() {
+            calc();
+          }, 100);
+          timeout = setTimeout(function() {
+            clearInterval(interval);
+          }, 45000);
+          window.pageLoad.then(function() {
+            setTimeout(function() {
+              clearInterval(interval);
+              clearTimeout(timeout);
+            }, 3000);
+          });
+          $scrollTarget.on('scroll', function() {
+            disabled || setState();
+          });
+          $window.on('resize', function() {
+            disabled || (calc(true), setState());
+          });
+          hasInit = true;
+        }
+      }
+
+      setOptions(options);
+      if (!disabled) {
+        init();
+      }
+      $window.on('resize', window.throttle(function() {
+        init();
+      }, 200));
+      return {
+        setOptions: setOptions,
+        refresh: function() {
+          calc(true, { animation: false }); setState();
+        }
+      };
+    }
+    $.fn.affix = affix;
+  });
+})();(function() {
+  var SOURCES = window.TEXT_VARIABLES.sources;
+  window.Lazyload.js(SOURCES.jquery, function() {
+    function toc(options) {
+      var $root = this, $window = $(window), $scrollTarget, $scroller, $tocUl = $('<ul class="toc toc--ellipsis"></ul>'), $tocLi, $headings, $activeLast, $activeCur,
+        selectors = 'h1,h2,h3', container = 'body', scrollTarget = window, scroller = 'html, body', disabled = false,
+        headingsPos, scrolling = false, hasRendered = false, hasInit = false;
+
+      function setOptions(options) {
+        var _options = options || {};
+        _options.selectors && (selectors = _options.selectors);
+        _options.container && (container = _options.container);
+        _options.scrollTarget && (scrollTarget = _options.scrollTarget);
+        _options.scroller && (scroller = _options.scroller);
+        _options.disabled !== undefined && (disabled = _options.disabled);
+        $headings = $(container).find(selectors).filter('[id]');
+        $scrollTarget = $(scrollTarget);
+        $scroller = $(scroller);
+      }
+      function calc() {
+        headingsPos = [];
+        $headings.each(function() {
+          headingsPos.push(Math.floor($(this).position().top));
+        });
+      }
+      function setState(element, disabled) {
+        var scrollTop = $scrollTarget.scrollTop(), i;
+        if (disabled || !headingsPos || headingsPos.length < 1) { return; }
+        if (element) {
+          $activeCur = element;
+        } else {
+          for (i = 0; i < headingsPos.length; i++) {
+            if (scrollTop >= headingsPos[i]) {
+              $activeCur = $tocLi.eq(i);
+            } else {
+              $activeCur || ($activeCur = $tocLi.eq(i));
+              break;
+            }
+          }
+        }
+        $activeLast && $activeLast.removeClass('active');
+        ($activeLast = $activeCur).addClass('active');
+      }
+      function render() {
+        if(!hasRendered) {
+          $root.append($tocUl);
+          $headings.each(function() {
+            var $this = $(this);
+            $tocUl.append($('<li></li>').addClass('toc-' + $this.prop('tagName').toLowerCase())
+              .append($('<a></a>').text($this.text()).attr('href', '#' + $this.prop('id'))));
+          });
+          $tocLi = $tocUl.children('li');
+          $tocUl.on('click', 'a', function(e) {
+            e.preventDefault();
+            var $this = $(this);
+            scrolling = true;
+            setState($this.parent());
+            $scroller.scrollToAnchor($this.attr('href'), 400, function() {
+              scrolling = false;
+            });
+          });
+        }
+        hasRendered = true;
+      }
+      function init() {
+        var interval, timeout;
+        if(!hasInit) {
+          render(); calc(); setState(null, scrolling);
+          // run calc every 100 millisecond
+          interval = setInterval(function() {
+            calc();
+          }, 100);
+          timeout = setTimeout(function() {
+            clearInterval(interval);
+          }, 45000);
+          window.pageLoad.then(function() {
+            setTimeout(function() {
+              clearInterval(interval);
+              clearTimeout(timeout);
+            }, 3000);
+          });
+          $scrollTarget.on('scroll', function() {
+            disabled || setState(null, scrolling);
+          });
+          $window.on('resize', window.throttle(function() {
+            if (!disabled) {
+              render(); calc(); setState(null, scrolling);
+            }
+          }, 100));
+        }
+        hasInit = true;
+      }
+
+      setOptions(options);
+      if (!disabled) {
+        init();
+      }
+      $window.on('resize', window.throttle(function() {
+        init();
+      }, 200));
+      return {
+        setOptions: setOptions
+      };
+    }
+    $.fn.toc = toc;
+  });
+})();(function() {
+  var SOURCES = window.TEXT_VARIABLES.sources;
+  window.Lazyload.js(SOURCES.jquery, function() {
+    var $body = $('body'), $window = $(window);
+    var $pageRoot = $('.js-page-root'), $pageMain = $('.js-page-main');
+    var activeCount = 0;
+    function modal(options) {
+      var $root = this, visible, onChange;
+      var scrollTop;
+      function setOptions(options) {
+        var _options = options || {};
+        visible = _options.initialVisible === undefined ? false : show;
+        onChange = _options.onChange;
+      }
+      function init() {
+        setState(visible);
+      }
+      function setState(isShow) {
+        if (isShow === visible) {
+          return;
+        }
+        visible = isShow;
+        if (visible) {
+          activeCount ++;
+          scrollTop = $(window).scrollTop() || $pageMain.scrollTop();
+          $root.addClass('modal--show');
+          $pageMain.scrollTop(scrollTop);
+          activeCount === 1 && ($pageRoot.addClass('show-modal'), $body.addClass('of-hidden'));
+          $window.on('scroll', hide);
+          $window.on('keyup', handleKeyup);
+        } else {
+          activeCount > 0 && activeCount --;
+          $root.removeClass('modal--show');
+          $window.scrollTop(scrollTop);
+          activeCount === 0 && ($pageRoot.removeClass('show-modal'), $body.removeClass('of-hidden'));
+          $window.off('scroll', hide);
+          $window.off('keyup', handleKeyup);
+        }
+        onChange && onChange(visible);
+      }
+      function show() {
+        setState(true);
+      }
+      function hide() {
+        setState(false);
+      }
+      function handleKeyup(e) {
+        // Char Code: 27  ESC
+        if (e.which ===  27) {
+          hide();
+        }
+      }
+      setOptions(options);
+      init();
+      return {
+        show: show,
+        hide: hide
+      };
+    }
+    $.fn.modal = modal;
+  });
+})();/*(function () {
+
+})();*/</script><script>var SOURCES = window.TEXT_VARIABLES.sources;
+var PAHTS = window.TEXT_VARIABLES.paths;
+window.Lazyload.js([SOURCES.jquery, PAHTS.search_js], function() {
+  var searchData = window.TEXT_SEARCH_DATA ? initData(window.TEXT_SEARCH_DATA) : {};
+
+  function memorize(f) {
+    var cache = {};
+    return function () {
+      var key = Array.prototype.join.call(arguments, ',');
+      if (key in cache) return cache[key];
+      else return cache[key] = f.apply(this, arguments);
+    };
+  }
+
+  function initData(data) {
+    var _data = [], i, j, key, keys, cur;
+    keys = Object.keys(data);
+    for (i = 0; i < keys.length; i++) {
+      key = keys[i], _data[key] = [];
+      for (j = 0; j < data[key].length; j++) {
+        cur = data[key][j];
+        cur.title = window.decodeUrl(cur.title);
+        cur.url = window.decodeUrl(cur.url);
+        _data[key].push(cur);
+      }
+    }
+    return _data;
+  }
+
+  /// search
+  function searchByQuery(query) {
+    var i, j, key, keys, cur, _title, result = {};
+    keys = Object.keys(searchData);
+    for (i = 0; i < keys.length; i++) {
+      key = keys[i];
+      for (j = 0; j < searchData[key].length; j++) {
+        cur = searchData[key][j], _title = cur.title;
+        if ((result[key] === undefined || result[key] && result[key].length < 4 )
+          && _title.toLowerCase().indexOf(query.toLowerCase()) >= 0) {
+          if (result[key] === undefined) {
+            result[key] = [];
+          }
+          result[key].push(cur);
+        }
+      }
+    }
+    return result;
+  }
+
+  var renderHeader = memorize(function(header) {
+    return $('<p class="search-result__header">' + header + '</p>');
+  });
+
+  var renderItem = function(index, title, url) {
+    return $('<li class="search-result__item" data-index="' + index + '"><a class="button" href="' + url + '">' + title + '</a></li>');
+  };
+
+  function render(data) {
+    if (!data) { return null; }
+    var $root = $('<ul></ul>'), i, j, key, keys, cur, itemIndex = 0;
+    keys = Object.keys(data);
+    for (i = 0; i < keys.length; i++) {
+      key = keys[i];
+      $root.append(renderHeader(key));
+      for (j = 0; j < data[key].length; j++) {
+        cur = data[key][j];
+        $root.append(renderItem(itemIndex++, cur.title, cur.url));
+      }
+    }
+    return $root;
+  }
+
+  // search box
+  var $searchBox = $('.js-search-box');
+  var $searchInput = $searchBox.children('input');
+  var $searchClear = $searchBox.children('.js-icon-clear');
+  var $result = $('.js-search-result'), $resultItems;
+  var lastActiveIndex, activeIndex;
+
+  function searchBoxEmpty() {
+    $searchBox.removeClass('not-empty'); $result.html(null);
+    $resultItems = $('.search-result__item'); activeIndex = 0;
+  }
+
+  $searchInput.on('input', window.throttle(function() {
+    var val = $(this).val();
+    if (val === '' || typeof val !== 'string') {
+      searchBoxEmpty();
+    } else {
+      $searchBox.addClass('not-empty'); $result.html(render(searchByQuery(val)));
+      $resultItems = $('.search-result__item'); activeIndex = 0;
+      $resultItems.eq(0).addClass('active');
+    }
+  }, 400));
+  $searchInput.on('focus', function() {
+    $(this).addClass('focus');
+  });
+  $searchInput.on('blur', function() {
+    $(this).removeClass('focus');
+  });
+  $searchClear.on('click', function() {
+    $searchInput.val(''); searchBoxEmpty();
+  });
+
+  // search panel
+  var $searchModal = $('.js-page-search-modal');
+  var $searchToggle = $('.js-search-toggle');
+  var modalVisible = false;
+
+  var searchModal = $searchModal.modal({ onChange: handleModalChange });
+
+  function handleModalChange(visible) {
+    modalVisible = visible;
+    if (visible) {
+      $searchInput[0].focus();
+    } else {
+      $searchInput[0].blur();
+      setTimeout(function() {
+        $searchInput.val(''); searchBoxEmpty();
+        window.pageAsideAffix && window.pageAsideAffix.refresh();
+      }, 400);
+    }
+  }
+
+  $searchToggle.on('click', function() {
+    modalVisible ? searchModal.hide() : searchModal.show();
+  });
+
+  function updateResultItems() {
+    lastActiveIndex >= 0 && $resultItems.eq(lastActiveIndex).removeClass('active');
+    activeIndex >= 0 && $resultItems.eq(activeIndex).addClass('active');
+  }
+
+  function moveActiveIndex(direction) {
+    var itemsCount = $resultItems ? $resultItems.length : 0;
+    if (itemsCount > 1) {
+      lastActiveIndex = activeIndex;
+      if (direction === 'up') {
+        activeIndex = (activeIndex - 1 + itemsCount) % itemsCount;
+      } else if (direction === 'down') {
+        activeIndex = (activeIndex + 1 + itemsCount) % itemsCount;
+      }
+      updateResultItems();
+    }
+  }
+
+  // Char Code: 13  Enter, 37  ⬅, 38  ⬆, 39  ➡, 40  ⬇, 83  S, 191 /
+  $(window).on('keyup', function(e) {
+    if (modalVisible) {
+      if (e.which === 38) {
+        modalVisible && moveActiveIndex('up');
+      } else if (e.which === 40) {
+        modalVisible && moveActiveIndex('down');
+      } else if (e.which === 13) {
+        modalVisible && $resultItems && activeIndex >= 0 && $resultItems.eq(activeIndex).children('a')[0].click();
+      }
+    } else {
+      if (!window.isFormElement(e.target || e.srcElement) && (e.which === 83 || e.which === 191)) {
+        modalVisible || searchModal.show();
+      }
+    }
+  });
+
+  $result.on('mouseover', '.search-result__item > a', function() {
+    var itemIndex = $(this).parent().data('index');
+    itemIndex >= 0 && (lastActiveIndex = activeIndex, activeIndex = itemIndex, updateResultItems());
+  });
+});</script>
+    </div>
+    <script>(function () {
+  var $root = document.getElementsByClassName('root')[0];
+  if (window.hasEvent('touchstart')) {
+    $root.dataset.isTouch = true;
+    document.addEventListener('touchstart', function(){}, false);
+  }
+})();</script>
+  </body>
+</html>
