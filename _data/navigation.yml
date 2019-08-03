@@ -3,6 +3,9 @@ header:
       zh:       首页
     url:        /index.html
   - titles:
+      zh:       错题本
+    url:        /doc/cuotiben/index.html
+  - titles:
       zh:       归档
     url:        /archive.html
   - titles:

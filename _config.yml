@@ -48,3 +48,15 @@ title: 杭州数橙科技
 lang: zh
 timezone: Asia/Shanghai
 
+# 集合
+collections:
+  # doc 集合
+  doc:
+      output: true
+      defaults:
+        - scope:
+            path: ""
+            type: my_collection
+          values:
+            layout: article
+
