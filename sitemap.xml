@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9 http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd" xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 <url>
+<loc>http://code.91chengguo.com/blog/%E7%A7%BB%E5%8A%A8%E7%AB%AFH5%E9%A1%B5%E9%9D%A2%E9%9D%99%E6%80%81%E8%B5%84%E6%BA%90%E6%96%87%E4%BB%B6%E7%BC%93%E5%AD%98.html</loc>
+<lastmod>2019-07-31T08:00:00+08:00</lastmod>
+</url>
+<url>
 <loc>http://code.91chengguo.com/doc/cuotiben/</loc>
 <lastmod>2019-08-01T00:00:00+08:00</lastmod>
 </url>
@@ -15,10 +19,6 @@
 <url>
 <loc>http://code.91chengguo.com/doc/help/</loc>
 <lastmod>2019-08-01T00:00:00+08:00</lastmod>
-</url>
-<url>
-<loc>http://code.91chengguo.com/2019/07/31/%E7%A7%BB%E5%8A%A8%E7%AB%AFH5%E9%A1%B5%E9%9D%A2%E9%9D%99%E6%80%81%E8%B5%84%E6%BA%90%E6%96%87%E4%BB%B6%E7%BC%93%E5%AD%98.html</loc>
-<lastmod>2019-07-31T08:00:00+08:00</lastmod>
 </url>
 <url>
 <loc>http://code.91chengguo.com/about.html</loc>
